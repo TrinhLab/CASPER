@@ -1,5 +1,7 @@
-import sys
-import math
+"""Algorithms.py File.  This file contains the following classes: SeqTranslate.
+    SeqTranslate Class. Used for interpreting base64 representations of the target locations as well as their sequences.
+    To interpret these run the class instance at the bottom of the file with the desired base64 representation into the
+    decompress_tuple function."""
 
 
 class SeqTranslate:
@@ -39,5 +41,14 @@ class SeqTranslate:
         else:
             return base10seq
 
+    def decompress_tuple(self,locseq):
+        mytuple = locseq.split(",")
+        loc = mytuple[0]
+        seq = mytuple[1][1:-1]
+        myloc = self.decompress64(loc)
+        myseq = self.decompress64(seq,True)
+        print("Location: " + str(myloc))
+        print("Sequence: " + myseq)
+
 S = SeqTranslate()
-print(S.decompress64("GOZ"))
+S.decompress_tuple("Q1k,+wDJcL7M")
