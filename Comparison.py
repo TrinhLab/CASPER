@@ -1,4 +1,12 @@
-__author__ = 'brianmendoza'
+"""This file is for analyzing sequences across organisms.  Use this to find repeated sequences in a group of organisms.
+    To run, type the list of organisms you want to run in the list object directly below.
+    WARNING: If you want comparisons to contain annotations, you will need to have GenBank files for all the organisms
+    labelled in the directory."""
+
+orgs = [" ", " "]  # e.g. sce, yli, eco
+endo = " "  # e.g. spCas9
+CASPER_Seq_Finder_files_path = "C:/"
+outputfilepath = "C:/"
 
 import os
 
@@ -7,7 +15,7 @@ from GenBankParse import GenBankFile
 
 class Compare_Orgs:
 
-    def __init__(self, endo, orgs):
+    def __init__(self):
         # Dict of dicts. Key: Organism. Value: Dictionary of lists of unique Positions where key is chromosome
         self.positions = {}
         # Dict of lists. Key: Organism. Value: List of repeated Sequences
@@ -39,7 +47,7 @@ class Compare_Orgs:
 
     # Takes an organism and parses the target data into positions and repeated sequences containers
     def make_lists(self, org):
-        name1 = "/Users/brianmendoza/Desktop/CrisprDB/" + org + self.endo + ".txt"
+        name1 = CASPER_Seq_Finder_files_path + org + self.endo + ".txt"
         f = open(name1, 'r')
         while True:
             position = f.readline()
@@ -121,7 +129,6 @@ class Compare_Orgs:
             # Iterates through the repeated sequences and assigns its position as an "error" string
             for item in self.sequences[org]:
                 self.searchableseqs[org][item] = ("repeat. ", "look up for position")
-            print "done."
 
     def compare(self):
         a, b = self.organisms[0], self.organisms[1]
@@ -129,7 +136,6 @@ class Compare_Orgs:
             c = self.organisms[2]
         for seq in self.searchableseqs[a]:
             if seq in self.searchableseqs[b]:
-                print "found one"
                 self.add_to_container(seq,a,b,'0')
                 if len(self.organisms) == 3:  # if there are only two to be compared
                     if seq in self.searchableseqs[c]:
@@ -157,7 +163,7 @@ class Compare_Orgs:
         self.containers[a+b].append(inputstring)
 
     def write_to_file(self):
-        os.chdir("/Users/brianmendoza/Desktop/CrisprDB/multiData/")
+        os.chdir(outputfilepath)
         filename = "compare_"
         for org in self.organisms:
             filename += org + "_"
@@ -178,7 +184,5 @@ class Compare_Orgs:
             f.write("NEXT" + "\n")
         f.close()
 
-#clo = ["ctx", "cac", "cace", "cbe", "cbut", "ccb", "ckl", "csb", "csr", "ttm", "tto", "ebl", "ate", "tre", "cce"]
-#for cac in clo:
-pare = Compare_Orgs("SpCas9", ["ckl", "cac", "cce"])
+pare = Compare_Orgs()
 

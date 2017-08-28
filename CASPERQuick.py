@@ -1,9 +1,70 @@
-#make this the file with all the tedious KEGG and Uniprot parsing code
+"""This file is a rapid way to investigate CASPER_Seq_Finder generated files for target locations. Run this python file
+    AFTER you have created your setup file: Cquicksetup.txt."""
 
+setup_path = "Cquicksetup.txt"  # Change this to the complete path of your setup file
+
+
+# ------------------------------------------- CODE THE USER CAN IGNORE --------------------------------------------- #
+import os
+from Algorithms import SeqTranslate
 from bioservices import KEGG
 import requests
 from bs4 import BeautifulSoup
-from Algorithms import SeqTranslate
+
+
+class CasperQuick:
+
+    def __init__(self):
+        self.ST = SeqTranslate()
+        self.allTargets = {}
+        self.location = tuple()
+        self.output = str()
+        self.loadGenesandTargets()
+        self.printoutresultstofile()
+
+    def loadGenesandTargets(self):
+        f = open(setup_path)
+        info = dict()
+        for line in f:
+            if line.find('=') != -1:
+                mytuple = line.split('=')
+                info[mytuple[0]] = mytuple[1][:-1]
+        f.close()
+        casperseqfile = info['FILENAME']
+        self.output = info['OUTPUT FILE PATH']
+        region_keggs = info['REGION OR KEGG CODE'].split(';')
+        for region_kegg in region_keggs:
+            if region_kegg[0] == '(':
+                region = region_kegg[1:-1].split(',')
+                self.location = region
+            else:
+                k = Kegg()
+                self.location = k.gene_locator(region_kegg)
+            myfy = open(casperseqfile)
+            while True:
+                line = myfy.readline()
+                if line.find('CHROMOSOME') != -1:
+                    if line[line.find('CHROMSOME')+2:-1] == self.location[0]:
+                        break
+            curpos = int()
+            while curpos < self.location[1]:
+                line = myfy.readline()
+                curpos = self.ST.decompress64(line.split(',')[0])
+            while curpos < self.location[2]:
+                line = myfy.readline().split(",")[:-1]
+                curpos = self.ST.decompress64(line[0])
+                seq = line[1][0] + self.ST.decompress64(line[1][1:-1], True)
+                mytuple = (curpos,seq)
+                self.allTargets[region_kegg].append(mytuple)
+            myfy.close()
+
+    def printoutresultstofile(self):
+        f = open(self.output, 'w')
+        for item, targets in self.allTargets:
+            f.write(item)
+            for target in targets:
+                f.write(target)
+        f.close()
 
 
 class Kegg:
@@ -45,7 +106,7 @@ class Kegg:
                 endloc = newstr[spc+2:len(newstr)-1]
             else:
                 endloc = newstr[spc+2:len(newstr)]
-        totloc = (chromosome, sense, int(startloc), int(endloc))
+        totloc = (chromosome, int(startloc), int(endloc))
         return totloc
 
     def translate_chromosome(self, chr):
@@ -107,114 +168,3 @@ class Kegg:
             pos = (spos, epos)
             exon_position_tuples.append(pos)
         return exon_position_tuples
-
-
-class SeqFromCSPR:
-
-    def __init__(self, filename):
-        self.filename = filename
-        self.targets = list()
-        self.repeats = dict()
-
-    def decode_targets(self):
-        f = open(self.filename)
-        # make sure to recognize chromosome number
-        data = f.readline()[:-1]
-        while data != "REPEATS":
-            data = f.readline()[:-1]
-            # parse location and sequence
-            midpoint = data.find(',')
-            location = data[:midpoint]
-            sequence = data[midpoint+1:]
-            # decompress the location and sequence information
-            s = SeqTranslate()
-            location = s.decompress64(location,toseq=False)
-            sequence = s.decompress64(sequence,toseq=True)
-            # add location to storage vector
-            self.targets.append((location, sequence))
-
-    def decode_repeats(self):
-        f = open(self.filename)
-        for line in f:
-            if line[:-1] == "REPEATS":
-                break
-        r_line = f.readline()
-
-    def print_targets(self):
-        for item in self.targets:
-            print(item)
-
-class SeqFromFasta:
-
-    def __init__(self):
-        self.filename = ""
-        self.genesequence = ""
-        self.targets = []
-
-    def getgenesequence(self):
-        return self.genesequence
-
-    def gettargets(self):
-        return self.targets
-
-    def complement(self, myseq):
-        revseq = ""
-        change = {'A': 'T',
-                  'T': 'A',
-                  'G': 'C',
-                  'C': 'G'}
-        for nt in myseq:
-            rnt = change[nt]
-            revseq = rnt + revseq
-        return revseq
-
-    def setfilename(self, filename):
-        self.filename = filename
-
-    def getsequenceandtargets(self, geneinfo, added_front, added_end, dbpath, endo):
-        chrom = int(geneinfo[0])
-        print(chrom)
-        chromseq = ""
-        if geneinfo[1]:
-            spos = geneinfo[2] - added_front
-            epos = geneinfo[3] + added_end
-        else:
-            spos = geneinfo[2] - added_end
-            epos = geneinfo[3] + added_front
-        f = open(self.filename)
-        counter = 0
-        for line in f:
-            if line[0] == '>':
-                counter += 1
-                continue
-            if counter == chrom:
-                chromseq += line[0:-1]
-            elif counter > chrom:
-                break
-        f.close()
-        sequence = chromseq[spos-1:epos]
-        if geneinfo[1]:
-            self.genesequence = sequence
-        else:
-            self.genesequence = self.complement(sequence)
-
-        # --- Target acquisition now ---- #
-
-        filename = dbpath + '-' + endo + ".txt"
-        f = open(filename)
-        while True:
-            line = f.readline()
-            if line[0:-1] == "CHROMOSOME #" + str(chrom):
-                while True:
-                    pos = f.readline()
-                    direct = pos[-2:-1]
-                    pos = int(pos[0:-2])
-                    if geneinfo[2] < pos:
-                        targetpos = (pos, direct)
-                        self.targets.append(targetpos)
-                    if geneinfo[3] < pos:
-                        break
-                break
-        f.close()
-
-
