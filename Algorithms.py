@@ -7,6 +7,7 @@ class SeqTranslate:
     def __init__(self):
         self.base_array_64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
+    # used to convert numbers in base4 back to nucleotides
     def int2nt(self, num):
         if num == 0:
             return 'A'
@@ -19,7 +20,8 @@ class SeqTranslate:
         else:
             return 'N'
 
-    def decompress64(self, base64seq, toseq=True):
+    # Decompresses the base64 representation into base10.  If toseq is true it returns the sequence itself (nucleotides)
+    def decompress64(self, base64seq, toseq=False):
         base10seq = int()
         for i in range(len(base64seq)):
             power = len(base64seq) - (i+1)
@@ -28,7 +30,7 @@ class SeqTranslate:
         if toseq:
             seq = str()
             number = base10seq
-            while number>4:
+            while number>=4:
                 rem = number%4
                 number = int(number/4)
                 seq += self.int2nt(rem)
@@ -36,3 +38,6 @@ class SeqTranslate:
             return seq
         else:
             return base10seq
+
+S = SeqTranslate()
+print(S.decompress64("GOZ"))
