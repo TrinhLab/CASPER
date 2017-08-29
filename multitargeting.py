@@ -3,12 +3,15 @@
     endonuclease. Before doing anything, change the path object below to the appropriate path."""
 
 # Please insert the appropriate path where you are storing your CASPER_Seq_Finder files
-path = "C:/"
-CASPER_Seq_Finder_file = " "  # change this to the CASPER_seq_Finder file of your choice
+path = "/Users/brianmendoza/Desktop/Sequences/"
+CASPER_Seq_Finder_file = "/Users/brianmendoza/Desktop/Sequences/test2spCas9.txt"  # change this to the CASPER_seq_Finder file of your choice
 
 import operator
 import os
 from Algorithms import SeqTranslate
+
+
+# ----------------------------------CODE BELOW CAN BE IGNORED BY USER------------------------------------------------ #
 
 
 class Random_Mutagenesis:
@@ -21,32 +24,31 @@ class Random_Mutagenesis:
         self.get_instances()
 
     def get_instances(self):
+            ST = SeqTranslate()
             os.chdir(path)
             f = open(self.file_name, 'r')
             while True:
                 x = f.readline()
-                if x[0:3] == 'BAD':
-                    print("reached bad sequences")
+                if x == 'REPEATS\n':
+                    print("reached repeat sequences")
                     break
-            isnewseq = True
             while True:
-                if isnewseq:
-                    t = f.readline()
-                if t[0:3] == 'NAG':
-                    print("reached end of bad sequences")
+                t = f.readline()
+                if t == 'END_OF_FILE':
+                    print("reached end of repeat sequences")
                     break
-                ukey = t
-                key = self.decompress(ukey)[0:-1]  # takes away the "\n" in the string
-                self.BAD_instances[key] = []
-                while True:
-                    v = f.readline()
-                    if "," in v:
-                        value = tuple(v.split(","))
-                        self.BAD_instances[key].append(value)
-                    else:
-                        t = v
-                        isnewseq = False
-                        break
+                ukey = t[:-1]  # takes away the "\n" in the string
+                key = ST.decompress64(ukey, True)
+                self.BAD_instances[key] = list()
+                # Add sequences and locations to the list
+                v = f.readline().split('\t')[:-1]
+                for item in v:
+                    loctup = item.split(',')
+                    chrom = loctup[0]
+                    location = ST.decompress64(loctup[1])
+                    tailseq = loctup[2][0] + ST.decompress64(loctup[2][1:], True)
+                    mytup = (chrom, location, tailseq)
+                    self.BAD_instances[key].append(mytup)
             f.close()
             print("currently sorting")
             for key in self.BAD_instances:
@@ -54,7 +56,7 @@ class Random_Mutagenesis:
                 newtuple = (key, self.BAD_instances[key], size)  # sequence, location, size
                 self.sorted_instances.append(newtuple)
 
-    # Returns the container self.sorted_instances but removes all "single" repeats
+    # Returns the container self.sorted_instances but removes all "single" repeats. Old Code to fix an off-by-1 error
     def return_all_seqs(self):
         myseqs = []
         for instance in self.sorted_instances:
@@ -71,13 +73,9 @@ class Random_Mutagenesis:
                     amounts[instance[2]] += 1
                 else:
                     amounts[instance[2]] = 1
-                print(str(instance[0]) + "," + str(instance[2]))
+                print(str(instance[0]) + "," + str(instance[2]) + "," + str(instance[1]))
         for element in amounts:
-            print(str(element) + "," + str(amounts[element]))
-
-                # print instance[2]
-                # for pos in instance[1]:
-                    # print pos[0] + "," + pos[1]
+            print("Number of seed sequences with " + str(element) + " appearances: " + str(amounts[element]))
 
     def return_positions(self):
         positions_mapped = []  # chromosme, beginning of range, end of range, and number of hits
@@ -108,23 +106,6 @@ class Random_Mutagenesis:
             print(sequences)
         return sorted_positions
 
-
-
-    def decompress(self, compressed_seq):
-        matrixString = '!m#$%&()*+j-./23456789:;<=>?@BDEFHIJKLMNOPQRSkVWXYZ[]^_abcdefghi'
-        seq = ''
-        for c in compressed_seq:
-            index = matrixString.find(c)
-            if index == -1:
-                triad = c
-            else:
-                z = index % 4
-                y = (index/4) % 4
-                x = index/16
-                triad = self.int_to_char(x) + self.int_to_char(y) + self.int_to_char(z)
-            seq += triad
-        return seq
-
     def int_to_char(self, i):
         switcher = {
             0: 'A',
@@ -136,4 +117,4 @@ class Random_Mutagenesis:
 
 r = Random_Mutagenesis()
 r.return_sorted()
-r.return_positions()
+#r.return_positions()
