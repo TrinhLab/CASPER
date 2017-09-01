@@ -1,6 +1,3 @@
 Write your desired sequences (one per line, not including the PAM) here for Off-Target Analysis. Delete the Example before running.
-e.g. ATGGAATCGGAGCGGCGCCA
-
-Add the complete path of CASPER_Seq_Finder basis files below to find off-targets.  Delete the example before running.
-e.g. /Users/brian/Desktop/scespCas9.txt
+TTGCGGAAGGATTTTTCTCA
 END

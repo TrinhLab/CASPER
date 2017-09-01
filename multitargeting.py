@@ -3,8 +3,6 @@
     endonuclease. Before doing anything, change the path object below to the appropriate path."""
 
 # Please insert the appropriate path where you are storing your CASPER_Seq_Finder files
-path = "/Users/brianmendoza/Desktop/Sequences/"
-CASPER_Seq_Finder_file = "/Users/brianmendoza/Desktop/Sequences/test2spCas9.txt"  # change this to the CASPER_seq_Finder file of your choice
 
 import operator
 import os
@@ -14,12 +12,12 @@ from Algorithms import SeqTranslate
 # ----------------------------------CODE BELOW CAN BE IGNORED BY USER------------------------------------------------ #
 
 
-class Random_Mutagenesis:
+class Multitargeting:
 
     BAD_instances = {}
     sorted_instances = []
 
-    def __init__(self):
+    def __init__(self, CASPER_Seq_Finder_file, output_path):
         self.file_name = CASPER_Seq_Finder_file
         self.get_instances()
 
@@ -39,6 +37,7 @@ class Random_Mutagenesis:
                     break
                 ukey = t[:-1]  # takes away the "\n" in the string
                 key = ST.decompress64(ukey, True)
+                key = ST.fill_As(key, 16)
                 self.BAD_instances[key] = list()
                 # Add sequences and locations to the list
                 v = f.readline().split('\t')[:-1]
@@ -46,8 +45,9 @@ class Random_Mutagenesis:
                     loctup = item.split(',')
                     chrom = loctup[0]
                     location = ST.decompress64(loctup[1])
-                    tailseq = loctup[2][0] + ST.decompress64(loctup[2][1:], True)
-                    mytup = (chrom, location, tailseq)
+                    seq = ST.decompress64(loctup[2][1:],True)
+                    seq = ST.fill_As(seq, 4)  # when A's get lost in the compression this fills them back in
+                    mytup = (chrom, location, seq)
                     self.BAD_instances[key].append(mytup)
             f.close()
             print("currently sorting")
@@ -115,6 +115,6 @@ class Random_Mutagenesis:
         }
         return switcher[i]
 
-r = Random_Mutagenesis()
-r.return_sorted()
+#r = Multitargeting()
+#r.return_sorted()
 #r.return_positions()

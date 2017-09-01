@@ -2,10 +2,6 @@
     to run with this program.
     WARNING: Running this protocol on a large number of sequences is unwise and may take significant computing power/time."""
 
-# Please set the location of your CASPEROfflist file!
-casperofflist = " "  # This is the complete path of your CASPEROfflist.txt file
-outfilepath = ""  # This is where your output file will go.  If left blank then it will go into the local directory
-
 
 # -------------------------------------- USER CAN IGNORE CODE BELOW THIS LINE ---------------------------------------- #
 
@@ -18,48 +14,83 @@ from Bio.Alphabet import IUPAC
 
 class OffTargetAlgorithm:
 
-    def __init__(self, targets, genomes):
+    def __init__(self, threshold, endo, base_org, csf_file, other_orgs, casperofflist, output_path):
+        self.ST = SeqTranslate()
         self.rSequences = []
-        self.get_rseqs(targets)
-        self.dna_seqs = list()
-        self.fill_dna(genomes)
+        self.get_rseqs(casperofflist)
+        self.mypath = csf_file[:csf_file.find(base_org)]
+        self.ref_genomes = [base_org]
+        self.ref_genomes += other_orgs
+        self.endo = endo
+        self.threshold = threshold
+        self.dSequence = str()  # global to class so that all scoring functions can use it
+
+        # This is for autofilling the HsuMatrix
         self.matrixKeys = ["GT", "AC", "GG", "TG", "TT", "CA", "CT", "GA", "AA", "AG", "TC", "CC"]
         self.matrix = {}
         self.fill_matrix()
 
-        outfile = open(outfilepath+"offtargetresults"+str(datetime.datetime.now()), 'w')
-        for seq in self.rSequences:
-            for dna_seq in self.dna_seqs:
-                self.dSequence = Seq(dna_seq[1], IUPAC.unambiguous_dna).reverse_complement()
-                hsu = self.get_hsu_score(seq)
-                qual = self.get_qualt_score(seq)
-                step = self.qualt_step_score(seq)
-                output = (math.sqrt(hsu) + step)*pow(qual,6)
-                if output > 0.3:
-                    outfile.write(dna_seq + output)
-        outfile.close()
+        # This is where the data is stored before it is written
+        self.output_data = dict()
+        for myseq in self.rSequences:
+            self.output_data[myseq[0]] = list()
 
-    def get_rseqs(self, targets):
+        # BEGIN RUNNING THROUGH SEQUENCES
+        for sequence in self.rSequences:
+            print(sequence)
+            for genome in self.ref_genomes:
+                f = open(self.mypath + genome + self.endo + ".cspr", 'r')
+                while True:
+                    line = f.readline()
+                    if line.find("CHROMOSOME") != -1:
+                        curchrom = line[line.find("#") + 1:-1]
+                        print("Finished checking " + curchrom)
+                    else:
+                        if line[0:-1] == "REPEATS":
+                            break
+                        # Checks for a signifcant number of mismatches:
+                        locseq = line[:-1].split(",")
+                        if self.critical_similarity(sequence[0], self.ST.decompress_csf_tuple(line)[1]):
+                            # This is where the real fun begins: off target analysis
+                            print('found a similarity')
+                            seqscore = self.get_scores(sequence[1],self.ST.decompress_csf_tuple(line)[1])
+                            if seqscore > self.threshold:
+                                self.output_data[sequence[0]].append((str(self.ST.decompress_csf_tuple(line)),
+                                                                      int(seqscore)))
+
+        # END SEQUENCES RUN
+        # Output the data acquired:
+        out = open(output_path + "off_results" + str(datetime.datetime.now().time()) + '.txt', 'w')
+        for sequence in self.output_data:
+            out.write(sequence + "\n")
+            for off_target in self.output_data[sequence]:
+                out.write(off_target[0] + str(off_target[1]) + '\n')
+
+    def get_rseqs(self, offlist):
+        targets = list()
+        cofile = open(offlist, 'r')
+        cofile.readline()
+        while True:
+            t = cofile.readline()[:-1]
+            if t == 'EN':
+                break
+            targets.append(t)
         for tar in targets:
+            compseed = self.ST.compress(tar[:16], 64)
+            comptail = self.ST.compress(tar[16:], 64)
+            compressed = compseed + "." + comptail
             rseq = ""
             for nt in tar[0:-1]:
                 rseq = nt + rseq
-            self.rSequences.append(rseq)
-        print(str(len(self.rSequences)))
+            self.rSequences.append([tar, rseq])
 
-    def fill_dna(self, genomes):
-        ST = SeqTranslate()
-        for genome in genomes:
-            f = open(genome)
-            fline = f.readline()
-            while line[:-1] != "REPEATS":
-                if line.find("CHROMOSOME") != -1:
-                    mytup = fline[:-1].split(',')
-                    loc = ST.decompress64(mytup[0])
-                    seq = mytup[1][0] + ST.decompress64(mytup[1][1:], True)
-                    mytup = (loc,seq)
-                    self.dna_seqs.append(mytup)
-            f.close()
+    def get_scores(self,rseq, dseq):
+        self.dSequence = Seq(dseq, IUPAC.unambiguous_dna).reverse_complement()
+        hsu = self.get_hsu_score(rseq)
+        qual = self.get_qualt_score(rseq)
+        step = self.qualt_step_score(rseq)
+        output = ((math.sqrt(hsu) + step) + pow(qual, 6))
+        return output
 
     def fill_matrix(self):
         f = open('CASPERinfo', 'r')
@@ -126,6 +157,19 @@ class OffTargetAlgorithm:
         retval = 1.0 - (delta/19.0)
         return retval
 
+    # If there is more than four mismatches it returns false, else it will return true
+    def critical_similarity(self, cseq1, cseq2):
+        mismatches = 0
+        lim = min([len(cseq1), len(cseq2)])
+        check = True
+        for i in range(lim):  # Doesn't matter whether you use cseq1 or cseq2 they are the same length
+            if cseq1[i] != cseq2[i]:
+                mismatches += 1
+                if mismatches == 5:
+                    check = False
+                    break
+        return check
+
     def int_to_char(self, i):
         switcher = {
             0: 'A',
@@ -143,16 +187,3 @@ class OffTargetAlgorithm:
             'G': 3
         }
         return switcher[c]
-
-f = open(casperofflist)
-sequences = list()
-targetgenomes = list()
-line = f.readline()
-while line.find('Add') != -1:
-    line = f.readline()[:-1]
-    sequences.append(line)
-while line[0:3] != 'END':
-    line = f.readline()[:-1]
-    targetgenomes.append(line)
-
-x = OffTargetAlgorithm(sequences, targetgenomes)

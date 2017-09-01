@@ -1,10 +1,6 @@
 """This file is a rapid way to investigate CASPER_Seq_Finder generated files for target locations. Run this python file
     AFTER you have created your setup file: Cquicksetup.txt."""
 
-setup_path = "Cquicksetup.txt"  # Change this to the complete path of your setup file
-
-
-# ------------------------------------------- CODE THE USER CAN IGNORE --------------------------------------------- #
 import os
 from Algorithms import SeqTranslate
 from bioservices import KEGG
@@ -14,56 +10,53 @@ from bs4 import BeautifulSoup
 
 class CasperQuick:
 
-    def __init__(self):
+    def __init__(self,casper_seq_file, output_file_path, ofa):
+        self.csffile = casper_seq_file
         self.ST = SeqTranslate()
         self.allTargets = {}
         self.location = tuple()
-        self.output = str()
-        self.loadGenesandTargets()
-        self.printoutresultstofile()
+        self.output = output_file_path
+        self.off_target_all = ofa
 
-    def loadGenesandTargets(self):
-        f = open(setup_path)
-        info = dict()
-        for line in f:
-            if line.find('=') != -1:
-                mytuple = line.split('=')
-                info[mytuple[0]] = mytuple[1][:-1]
-        f.close()
-        casperseqfile = info['FILENAME']
-        self.output = info['OUTPUT FILE PATH']
-        region_keggs = info['REGION OR KEGG CODE'].split(';')
+    def loadGenesandTargets(self, rk):
+        region_keggs = rk
         for region_kegg in region_keggs:
-            if region_kegg[0] == '(':
-                region = region_kegg[1:-1].split(',')
-                self.location = region
+            self.allTargets[str(region_kegg)] = list()
+            if type(region_kegg) == tuple:
+                self.location = region_kegg
             else:
                 k = Kegg()
                 self.location = k.gene_locator(region_kegg)
-            myfy = open(casperseqfile)
+            myfy = open(self.csffile)
             while True:
                 line = myfy.readline()
+                if line == '':
+                    break
                 if line.find('CHROMOSOME') != -1:
-                    if line[line.find('CHROMSOME')+2:-1] == self.location[0]:
+                    s = line.find("#")
+                    if line[s+1:-1] == str(self.location[0]):  # checks to see if it is on the right chromosome
+                        curpos = int()
+                        while curpos < int(self.location[1]):
+                            line = myfy.readline()
+                            curpos = self.ST.decompress64(line.split(',')[0])
+                        while curpos < int(self.location[2]):
+                            line = self.ST.decompress_csf_tuple(myfy.readline()[:-1])
+                            curpos = line[0]
+                            self.allTargets[str(region_kegg)].append(line)
                         break
-            curpos = int()
-            while curpos < self.location[1]:
-                line = myfy.readline()
-                curpos = self.ST.decompress64(line.split(',')[0])
-            while curpos < self.location[2]:
-                line = myfy.readline().split(",")[:-1]
-                curpos = self.ST.decompress64(line[0])
-                seq = line[1][0] + self.ST.decompress64(line[1][1:-1], True)
-                mytuple = (curpos,seq)
-                self.allTargets[region_kegg].append(mytuple)
             myfy.close()
 
+        self.printoutresultstofile()
+
     def printoutresultstofile(self):
-        f = open(self.output, 'w')
-        for item, targets in self.allTargets:
+        out = self.output + "quickresults.txt"
+        f = open(out, 'w')
+        for item in self.allTargets.keys():
             f.write(item)
-            for target in targets:
-                f.write(target)
+            f.write('\n')
+            for target in self.allTargets[item]:
+                insert = str(target[0]) + "," + str(target[1]) + "," + str(target[2]) + '\n'
+                f.write(insert)
         f.close()
 
 

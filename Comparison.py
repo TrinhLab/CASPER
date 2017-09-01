@@ -3,86 +3,99 @@
     WARNING: If you want comparisons to contain annotations, you will need to have GenBank files for all the organisms
     labelled in the directory."""
 
-orgs = [" ", " "]  # e.g. sce, yli, eco
-endo = " "  # e.g. spCas9
-CASPER_Seq_Finder_files_path = "C:/"
-outputfilepath = "C:/"
+# ---------------------------------- CODE BELOW CAN BE IGNORED BY USER ---------------------------------------------- #
 
 import os
 
 from GenBankParse import GenBankFile
+from Algorithms import SeqTranslate
+import itertools
 
 
 class Compare_Orgs:
 
-    def __init__(self):
-        # Dict of dicts. Key: Organism. Value: Dictionary of lists of unique Positions where key is chromosome
-        self.positions = {}
-        # Dict of lists. Key: Organism. Value: List of repeated Sequences
-        self.sequences = {}
+    def __init__(self, output_path, base_org_path, base_org, endo, other_genomes):
+        # initialize SeqTranslate object
+        self.ST = SeqTranslate()
+        self.output_path = output_path
+        # my_orgs contains just the
+        self.organisms = other_genomes
+        self.organisms.append(base_org)
+        self.organisms = sorted(self.organisms)
+        self.db_path = base_org_path[:base_org_path.find(base_org)]
 
-        # Dictionary of dictionaries. Key1: organism Key2: sequence Value: position
+        # Dictionary of dictionaries. Key1: generic total sequence Key2: org Value: position
         self.searchableseqs = {}
 
-        # Container for all the containers
-        self.containers = {}
+        # Container that stores all the sequences seen the combination of organisms defined by the key
+        # An example key would be (sce, yli) for the shared sequences between S.cerevisiae and Y.lipolytica
+        self.buckets = {}
 
-        # Intitialize containers with organism keys
-        self.organisms = []
-        for org in orgs:
-            self.organisms.append(org)
-            self.positions[org] = {}
-            self.sequences[org] = []
-            self.searchableseqs[org] = {}
+        # Intitialize the self.buckets container to contain the tuple of every organism subset
+        for i in range(2, len(self.organisms)):
+            for subset in itertools.combinations(self.organisms, i):
+                self.buckets[subset] = []
+                print(subset)
         self.endo = endo
+
+        # The object that is iterated over to decompress the output into readable form
+        self.compressed_output = {}
 
         # Generates the sequence lists
         for org in self.organisms:
+            print(org)
             self.make_lists(org)
-            self.find_sequences(org)
 
         # Runs the comparison
-        self.compare()
+        self.create_comparison()
         self.write_to_file()
 
     # Takes an organism and parses the target data into positions and repeated sequences containers
     def make_lists(self, org):
-        name1 = CASPER_Seq_Finder_files_path + org + self.endo + ".txt"
+        name1 = self.db_path + org + self.endo + ".cspr"
         f = open(name1, 'r')
+        curchrom = int()
         while True:
             position = f.readline()
-            if position[0:3] == "BAD":
-                break
-            # adds to the positions container the unique position with organism, and chromosome as keys
-            p = position.split(",")
-            if p[0] in self.positions[org]:
-                self.positions[org][p[0]].append(position)
+            if position.find("CHROMOSOME") != -1:
+                curchrom = position[position.find("#")+1:-1]
+                print(curchrom)
             else:
-                self.positions[org][p[0]] = []
-                self.positions[org][p[0]].append(position)
+                if position[0:-1] == "REPEATS":
+                    break
+                # adds to the positions container the unique position with organism, and chromosome as keys
+                line = position[:-1].split(",")
+                # change line into generic (no "+" or "-" change to generic .)
+                totseq = self.ST.to_generic_compressed(line[1])
+                self.add_to_sequence_matrix(totseq, org, curchrom, line[0])
 
         while True:
-            compseq = f.readline()
-            if compseq[0:3] == "NAG":
+            seedseq = f.readline()[:-1]
+            if seedseq.find("END_OF_FIL") != -1:
                 break
-            if not "," in compseq:
-                self.sequences[org].append(self.decompress(compseq[0:-1]))  # -1 to get rid of the "\n"
+            taillocs = f.readline().split('\t')[:-1]
+            for item in taillocs:
+                loctup = item.split(',')
+                totseq = self.ST.to_generic_compressed([seedseq,loctup[2][1:]])
+                self.add_to_sequence_matrix(totseq, org, loctup[0], loctup[1])
         f.close()
 
-    def decompress(self, compressed_seq):
-        matrixString = '!"#$%&()*+j-./23456789:;<=>?@BDEFHIJKLMNOPQRSkVWXYZ[]^_abcdefghi'
-        seq = ''
-        for c in compressed_seq:
-            index = matrixString.find(c)
-            if index == -1:
-                triad = c
+    # Takes in the variables of a sequence including what organism it is found on and adds it to the dict of dicts
+    # named:self.searchableseqs
+    def add_to_sequence_matrix(self, totseq, org, chrom, location):
+        if totseq in self.searchableseqs.keys():
+            # already seen this organism and sequence
+            if org in self.searchableseqs[totseq].keys():
+                self.searchableseqs[totseq][org].append((chrom, location))
+            # already seen this sequence but not this sequence in the organism
             else:
-                z = index % 4
-                y = (index/4) % 4
-                x = index/16
-                triad = self.int_to_char(x) + self.int_to_char(y) + self.int_to_char(z)
-            seq += triad
-        return seq
+                self.searchableseqs[totseq][org] = []
+                self.searchableseqs[totseq][org].append((chrom, location))
+        # new organism and new sequence
+        else:
+            self.searchableseqs[totseq] = {}
+            self.searchableseqs[totseq][org] = []
+            self.searchableseqs[totseq][org].append((chrom, location))
 
     def int_to_char(self, i):
         switcher = {
@@ -108,81 +121,40 @@ class Compare_Orgs:
             revseq = rnt + revseq
         return revseq
 
-    # This function takes in all the organisms compares them to each other generating a data set that includes
-    def find_sequences(self, org):
-        # Iterates through unique positions to add positions to seqsby container
-        # Element corresponds to a list of positions in the element's chromosome
-        for element in self.positions[org]:
-            gparse = GenBankFile(org)
-            chromstring = gparse.getChromSequence(int(element))
-            # Searches the chromstring for the position and returns the sequence and position as a tuple
-            for item in self.positions[org][element]:
-                pos = item.split(",")
-                gseq = ''
-                begin = int(pos[1])
-                if pos[2][0] == 'f':
-                    gseq = chromstring[begin-21:begin]  # 21 is for seed length
-                if pos[2][0] == 'r':
-                    gseq = self.revcom(chromstring[begin:(int(pos[1])+20)])
-                seqtuple = (pos[0], pos[1], pos[2][0])  # pos[3] is the score
-                self.searchableseqs[org][gseq] = seqtuple
-            # Iterates through the repeated sequences and assigns its position as an "error" string
-            for item in self.sequences[org]:
-                self.searchableseqs[org][item] = ("repeat. ", "look up for position")
-
-    def compare(self):
-        a, b = self.organisms[0], self.organisms[1]
-        if len(self.organisms) == 3:
-            c = self.organisms[2]
-        for seq in self.searchableseqs[a]:
-            if seq in self.searchableseqs[b]:
-                self.add_to_container(seq,a,b,'0')
-                if len(self.organisms) == 3:  # if there are only two to be compared
-                    if seq in self.searchableseqs[c]:
-                        self.add_to_container(seq,a,b,c)
-        if len(self.organisms) == 3:
-            for seq in self.searchableseqs[c]:
-                if seq in self.searchableseqs[a]:
-                    self.add_to_container(seq,a,c,'0')
-                elif seq in self.searchableseqs[b]:
-                    self.add_to_container(seq,b,c,'0')
-
-    def add_to_container(self, seq, a, b, c):
-        if a+b not in self.containers:
-            self.containers[a+b] = []
-        if a+b+c not in self.containers:
-            self.containers[a+b+c] = []
-        apos = self.searchableseqs[a][seq]
-        bpos = self.searchableseqs[b][seq]
-        inputstring = seq + ";" + apos[0] + ";" + apos[1] + ";" + bpos[0] + ";" + bpos[1]
-        if c != '0':
-            cpos = self.searchableseqs[c][seq]
-            inputstring += cpos[0] + ";" + cpos[1]
-            self.containers[a+b+c].append(inputstring)
-            return
-        self.containers[a+b].append(inputstring)
+    def create_comparison(self):
+        # Put every sequence in the appropriate bucket
+        tempdict = dict()
+        for sequence in self.searchableseqs:
+            # Look for the set of organisms containing this sequence
+            if len(self.searchableseqs[sequence].keys()) > 1:
+                # Make sure the tuple is in the right order
+                orgs = self.searchableseqs[sequence].keys()
+                orgs = tuple(sorted(orgs))
+                # iterate through all the sequences contained in each organism
+                for org in self.searchableseqs[sequence].keys():
+                    tempdict[org] = []
+                    for location in self.searchableseqs[sequence][org]:
+                        tempdict[org].append(location)
+                insert_tup = (sequence, tempdict)
+                tempdict = {}
+                # contains a list of tuples with the sequence then short dictionary of organisms containing sequence
+                self.buckets[orgs].append(insert_tup)
 
     def write_to_file(self):
-        os.chdir(outputfilepath)
-        filename = "compare_"
+        filename = self.output_path + "compare_"
         for org in self.organisms:
             filename += org + "_"
-        filename += ".txt"
+        filename += self.endo + ".txt"
         f = open(filename, 'w')
-        for container in self.containers:
-            original = 0
-            repeats = 0
-            f.write(str(container) + "\n")
-            for item in self.containers[container]:
-                if item.find("repeat") != -1:
-                    repeats += 1
-                else:
-                    original += 1
-                whatin = str(item)
-                f.write(whatin + "\n")
-            f.write("Statistics: " + str(original) + ";" + str(repeats) + "\n")
-            f.write("NEXT" + "\n")
+        for key in self.buckets:
+            f.write(str(key) + " " + str(len(self.buckets[key])) + "\n")
+            for seq in self.buckets[key]:
+                f.write(self.ST.decompress64(seq[0], True) + "\n")
+                for suborg in seq[1]:
+                    f.write(str(suborg) + ":")
+                    for locs in seq[1][suborg]:
+                        f.write(str(locs[0]) + "," + str(self.ST.decompress64(locs[1])) + "\t")
+                        f.write("\n")
+            f.write("\n")
         f.close()
-
-pare = Compare_Orgs()
 
