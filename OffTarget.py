@@ -49,22 +49,27 @@ class OffTargetAlgorithm:
                         if line[0:-1] == "REPEATS":
                             break
                         # Checks for a signifcant number of mismatches:
-                        locseq = line[:-1].split(",")
+                        #locseq = line[:-1].split(",")
                         if self.critical_similarity(sequence[0], self.ST.decompress_csf_tuple(line)[1]):
                             # This is where the real fun begins: off target analysis
                             print('found a similarity')
                             seqscore = self.get_scores(sequence[1],self.ST.decompress_csf_tuple(line)[1])
                             if seqscore > self.threshold:
-                                self.output_data[sequence[0]].append((str(self.ST.decompress_csf_tuple(line)),
-                                                                      int(seqscore)))
+                                self.output_data[sequence[0]].append((str(curchrom),
+                                                                      self.ST.decompress_csf_tuple(line[:-1]),
+                                                                      int(seqscore*100), genome))
 
         # END SEQUENCES RUN
         # Output the data acquired:
         out = open(output_path + "off_results" + str(datetime.datetime.now().time()) + '.txt', 'w')
+        out.write("Off-target sequences identified.  Scores are between O and 1.  A higher value indicates greater"
+                  "probability of off-target activity at that location.\n")
         for sequence in self.output_data:
             out.write(sequence + "\n")
             for off_target in self.output_data[sequence]:
-                out.write(off_target[0] + str(off_target[1]) + '\n')
+                outloc = off_target[0] + "," + str(off_target[1][0]) + "," + off_target[1][1]
+                out.write(off_target[3] + "," + outloc + "\t" + str(off_target[2]/100) + '\n')
+        out.close()
 
     def get_rseqs(self, offlist):
         targets = list()
