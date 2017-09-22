@@ -7,7 +7,6 @@
 
 import os
 
-from GenBankParse import GenBankFile
 from Algorithms import SeqTranslate
 import itertools
 
