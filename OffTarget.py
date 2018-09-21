@@ -126,12 +126,12 @@ class OffTargetAlgorithm:
         return score
 
     def get_qualt_score(self, rSequence):
-        score = 3.5477
+        score = 3.5977
         for i in range(0, 19):
             lookup = rSequence[i] + self.dSequence[i]
             if lookup in self.matrixKeys:
                 score -= 1.0/(i+1)
-        return score/3.5477
+        return score/3.5977
 
     def qualt_step_score(self, rSequence):
         score = 1.0

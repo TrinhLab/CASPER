@@ -218,3 +218,5 @@ class SeqFromFasta:
         f.close()
 
 
+# https://www.genome.jp/dbget-bin/get_linkdb?-t+genes+gn:T00005
+# https://www.genome.jp/dbget-bin/get_linkdb?-t+genes+gn:T01033
