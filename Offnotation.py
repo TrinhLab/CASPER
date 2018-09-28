@@ -5,7 +5,7 @@ complete off-target analysis."""
 def off_prep():
     lines_for_off = str()
 
-    f = open("/Users/brianmendoza/Dropbox/JGI_CASPER/pde_concise_data.csv")
+    f = open("/Users/brianmendoza/Dropbox/JGI_CASPER/kfd_concise_data.csv")
     for line in f:
         # Checks for scaffold or gene titles:
         if line.startswith("GENE") or line.startswith("SCAFF"):
@@ -14,7 +14,7 @@ def off_prep():
             lines_for_off += line
     f.close()
 
-    x = open("/Users/brianmendoza/Dropbox/JGI_CASPER/PdeOFF_QUERY.txt",'w')
+    x = open("/Users/brianmendoza/Dropbox/JGI_CASPER/KfdOFF_QUERY.txt",'w')
     x.write(lines_for_off)
     x.close()
 
@@ -22,13 +22,13 @@ def off_prep():
 #  This function appends the off-target data to the .csv "concise" file
 def concise_data_append_off():
     off_target_dict = dict()  # stores all the off targets found by CasperOffTarget
-    f = open("/Users/brianmendoza/Dropbox/CASPER/pde_off.txt")
+    f = open("/Users/brianmendoza/Dropbox/JGI_CASPER/kfd_off_results.txt")
     for line in f:
         l = line[:-1].split(",")
         off_target_dict[l[0]] = l[1]
     f.close()
     output_string = str()
-    condata = open("/Users/brianmendoza/Dropbox/JGI_CASPER/pde_concise_data.csv")
+    condata = open("/Users/brianmendoza/Dropbox/JGI_CASPER/kfd_concise_data.csv")
     for line in condata:
         # skip scaffold and lines:
         if line.startswith("SCAFF") or line.startswith("GENE"):
@@ -39,10 +39,10 @@ def concise_data_append_off():
         else:
             output_string += line
     # now output the revised version:
-    outfile = open("/Users/brianmendoza/Dropbox/JGI_CASPER/pde_concise_with_off.csv", "w")
+    outfile = open("/Users/brianmendoza/Dropbox/JGI_CASPER/kfd_concise_with_off.csv", "w")
     outfile.write(output_string)
     outfile.close()
 
 
 concise_data_append_off()
-
+#off_prep()
