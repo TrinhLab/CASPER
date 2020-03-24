@@ -1,5 +1,7 @@
 # CASPER
 
+IMPORTANT: For GUI software and enhanced algorithms please see the CASPERapp repository
+
 Codes for Enhanced guide-RNA Design and Targeting Analysis for Precise CRISPR Genome Editing of Single and Consortia of Industrially Relevant and Non-model Organisms
 
 Authors: Brian Mendoza and Cong T. Trinh (2017)
